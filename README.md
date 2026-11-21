@@ -18,28 +18,45 @@ SimpleNavigate — лёгкая и неблокирующая библиотек
 
 ---
 
-## Особенности
+## Оглавление
 
-- Инициализация любой кнопки в 1 строку: `SimpleButton btn(4);`
-- Событийная модель на базе C++11 лямбд прямо в `setup()`
-- Классический режим опроса через флаги внутри `loop()`
-- Встроенная машина состояний (FSM) без задержек `delay()`
-- Аппаратная фильтрация дребезга контактов (debounce)
-- Поддержка одиночного, двойного и N-кратного клика (мультиклик)
-- Ступенчатое удержание кнопки (`onHoldFor`) под разные интервалы времени
-- Автоповтор (`onStep`) с динамическим ускорением при удержании
-- Поддержка виртуальных, матричных и аналоговых кнопок через пользовательскую функцию чтения
-- Групповой опрос всех созданных кнопок одной командой `SimpleButton::tickAll()`
+1. [Возможности библиотеки](#возможности-библиотеки)
+2. [Установка](#установка)
+3. [Быстрый старт](#быстрый-старт)
+4. [Модуль SimpleButton (Кнопки)](#1-модуль-simplebutton-кнопки)
+5. [Модуль SimpleEncoder (Энкодеры)](#2-модуль-simpleencoder-энкодеры)
+6. [Модуль SimpleJoystick (Джойстики)](#3-модуль-simplejoystick-джойстики)
+7. [Модуль SimpleMatrix (Матричные клавиатуры)](#4-модуль-simplematrix-матричные-клавиатуры)
+8. [Модуль SimpleAnalogKeypad (Резистивные АЦП-кнопки)](#5-модуль-simpleanalogkeypad-резистивные-ацп-кнопки)
+9. [Модуль SimpleTouch (Сенсоры ESP32)](#6-модуль-simpletouch-сенсоры-esp32)
+10. [Фоновый опрос FreeRTOS (ESP32)](#7-фоновый-опрос-freertos-esp32)
+11. [Лицензия](#лицензия)
+
+---
+
+## Возможности библиотеки
+
+- **Инициализация в одну строку**: никаких сложных структур, конфигураций и лишнего кода.
+- **Событийная модель C++11**: назначение лямбд прямо в `setup()`.
+- **Нулевые задержки**: библиотека построена на конечных автоматах (FSM) и `millis()`, без единого `delay()`.
+- **Единая экосистема**: каждая клавиша матрицы, кнопка джойстика, АЦП-кнопка или сенсор работает через ядро `SimpleButton`.
+- **Централизованный диспетчер**: команда `SimpleNavigate::tickAll()` опрашивает все подключенные устройства разом.
+- **Многозадачность FreeRTOS**: фоновый опрос на отдельном ядре ESP32 с нулевой нагрузкой на `loop()`.
 
 ---
 
 ## Установка
 
 ### PlatformIO
-Поместите папку `SimpleButton` в каталог `lib/` вашего проекта.
+Скопируйте папку библиотеки в каталог `lib/` проекта:
+```ini
+; platformio.ini
+lib_deps =
+    SimpleNavigate
+```
 
 ### Arduino IDE
-Скопируйте папку `SimpleButton` в каталог `libraries/` в папке с вашими скетчами Arduino.
+Поместите папку библиотеки в каталог `libraries/` в папке с вашими скетчами Arduino.
 
 ---
 
@@ -47,165 +64,359 @@ SimpleNavigate — лёгкая и неблокирующая библиотек
 
 ```cpp
 #include <Arduino.h>
-#include <SimpleButton.h>
+#include <SimpleNavigate.h>
 
-SimpleButton button(4);
+SimpleButton btn(4);
 
 void setup() {
     Serial.begin(115200);
 
-    button.onPress([]() {
-        Serial.println("Press");
+    btn.onClick([]() {
+        Serial.println("Click");
     });
 
-    button.onClick([]() {
-        Serial.println("Single Click");
-    });
-
-    button.onDoubleClick([]() {
+    btn.onDoubleClick([]() {
         Serial.println("Double Click");
     });
 
-    button.onHold([]() {
+    btn.onHold([]() {
         Serial.println("Hold");
     });
 }
 
 void loop() {
-    button.tick();
+    SimpleNavigate::tickAll();
 }
 ```
 
 ---
 
-## Документация API
+## 1. Модуль SimpleButton (Кнопки)
 
-### Конструкторы
-
+### Создание объекта
 ```cpp
 SimpleButton(uint8_t pin, uint8_t activeLevel = LOW, uint8_t pinConfig = INPUT_PULLUP);
 SimpleButton(CustomReader reader);
 ```
 
-- По умолчанию пин настраивается как `INPUT_PULLUP` с активным уровнем `LOW`.
-- Для виртуальных и аналоговых кнопок передается лямбда, возвращающая `bool`.
-
 ### События (коллбэки)
-
 ```cpp
-void onPress(Callback callback);
-void onRelease(Callback callback);
-void onClick(Callback callback);
-void onDoubleClick(Callback callback);
-void onMultiClick(MultiCallback callback);
-void onHold(Callback callback);
-void onHoldFor(uint16_t durationMs, Callback callback);
-void onStep(Callback callback);
+btn.onPress([]() { });
+btn.onRelease([]() { });
+btn.onClick([]() { });
+btn.onDoubleClick([]() { });
+btn.onMultiClick([](uint8_t count) { });
+btn.onHold([]() { });
+btn.onHoldFor(3000, []() { });
+btn.onStep([]() { });
+btn.onToggle([](bool state) { });
+btn.onStuck([]() { });
 ```
 
-### Опрос флагов (классический стиль)
-
+### Проверка состояний (для loop)
 ```cpp
-bool isPressed() const;
+bool isPressed();
+bool hasPressed();
+bool hasReleased();
 bool isClick();
 bool isDouble();
 bool isHold();
 bool isStep();
+bool isToggled();
+bool isStuck();
 uint8_t getClicks();
-uint32_t getHoldTime() const;
+uint32_t getHoldTime();
 ```
 
-Флаги `isClick()`, `isDouble()`, `isHold()` и `isStep()` являются однократными и сбрасываются после чтения или на следующем вызове `tick()`.
-
-### Настройки таймингов
-
+### Тайминги и параметры
 ```cpp
-void setDebounce(uint16_t ms);
-void setHoldTime(uint16_t ms);
-void setStepTime(uint16_t ms);
-void setClickTimeout(uint16_t ms);
-void setStepAcceleration(uint16_t minIntervalMs, uint16_t stepDecayMs);
+btn.setDebounce(40);
+btn.setHoldTime(600);
+btn.setStepTime(150);
+btn.setClickTimeout(300);
+btn.setStepAcceleration(30, 5);
+btn.setStuckTimeout(15000);
 ```
 
-| Параметр | По умолчанию | Описание |
-| :--- | :--- | :--- |
-| `setDebounce` | 40 мс | Время фильтрации дребезга контактов |
-| `setHoldTime` | 600 мс | Время нажатия для перехода в удержание |
-| `setStepTime` | 150 мс | Базовый интервал автоповтора при удержании |
-| `setClickTimeout` | 300 мс | Время ожидания следующего клика в серии |
-| `setStepAcceleration` | отключено | Минимальный интервал и шаг уменьшения задержки |
-
-### Управление группой и сброс
-
+### Комбинации кнопок (`SimpleButtonCombo`)
 ```cpp
-static void tickAll();
-void reset();
+SimpleButton btnA(4);
+SimpleButton btnB(5);
+SimpleButtonCombo combo(btnA, btnB);
+
+void setup() {
+    combo.onHold([]() {
+        Serial.println("Both buttons held");
+    });
+}
 ```
 
 ---
 
-## Продвинутые примеры
+## 2. Модуль SimpleEncoder (Энкодеры)
 
-### Ступенчатое удержание под системные команды
+### Создание объекта
+```cpp
+SimpleEncoder enc(uint8_t pinA, uint8_t pinB, int8_t pinBtn = -1, uint8_t activeLevel = LOW, uint8_t pinConfig = INPUT_PULLUP);
+```
 
+### Возможности
+- Табличный квадратурный декодер с защитой от пропуска шагов и дребезга.
+- Повороты с одновременным удержанием кнопки вала (`onLeftHold`, `onRightHold`).
+- Адаптивное ускорение вращения (`isFast`).
+- Ограничение диапазона и зацикливание (`setRange`).
+
+### Пример
 ```cpp
 #include <Arduino.h>
-#include <SimpleButton.h>
+#include <SimpleNavigate.h>
 
-SimpleButton button(4);
+SimpleEncoder enc(4, 5, 18);
 
 void setup() {
     Serial.begin(115200);
 
-    button.onHoldFor(1000, []() {
-        Serial.println("1 sec: Action");
+    enc.setRange(0, 100, true);
+    enc.setAcceleration(true, 50, 5);
+
+    enc.onLeft([]() {
+        Serial.println("Left");
     });
 
-    button.onHoldFor(3000, []() {
-        Serial.println("3 sec: Menu");
+    enc.onRight([]() {
+        Serial.println("Right");
     });
 
-    button.onHoldFor(10000, []() {
-        Serial.println("10 sec: Reboot");
+    enc.onLeftHold([]() {
+        Serial.println("Left + Button Held");
+    });
+
+    enc.onRightHold([]() {
+        Serial.println("Right + Button Held");
+    });
+
+    enc.btn().onClick([]() {
+        Serial.println("Encoder Button Click");
     });
 }
 
 void loop() {
-    button.tick();
+    SimpleNavigate::tickAll();
 }
 ```
 
-### Групповой опрос и виртуальная кнопка
+---
 
+## 3. Модуль SimpleJoystick (Джойстики)
+
+### Создание объекта
+```cpp
+SimpleJoystick joy(uint8_t pinX, uint8_t pinY, int8_t pinBtn = -1, uint8_t activeLevel = LOW);
+```
+
+### Возможности
+- Нормализованные координаты от -100% до +100%.
+- Внутренняя и внешняя мертвые зоны (`setDeadzone`, `setOuterDeadzone`).
+- Фильтрация шумов АЦП (EMA) и экспонента отклика (`setExponent`).
+- Векторная математика: `getMagnitude()` (0..100%) и `getAngle()` (0..360°).
+- 4-позиционный и 8-позиционный D-Pad с автоповтором при удержании.
+- Распознавание хлестких рывков (жесты Flick и Double Flick).
+
+### Пример
 ```cpp
 #include <Arduino.h>
-#include <SimpleButton.h>
+#include <SimpleNavigate.h>
 
-SimpleButton btnA(4);
-SimpleButton btnB(5);
-SimpleButton btnAnalog([]() {
-    return analogRead(A0) > 512;
-});
+SimpleJoystick joy(34, 35, 19);
 
 void setup() {
     Serial.begin(115200);
 
-    btnA.onClick([]() {
-        Serial.println("A Click");
+    joy.setDeadzone(10);
+    joy.setOuterDeadzone(5);
+    joy.setExponent(1.8f);
+
+    joy.onUp([]() {
+        Serial.println("Up");
     });
 
-    btnB.setStepAcceleration(30, 5);
-    btnB.onStep([]() {
-        Serial.println("Fast Step");
+    joy.onDown([]() {
+        Serial.println("Down");
     });
 
-    btnAnalog.onClick([]() {
-        Serial.println("Analog Click");
+    joy.onFlick(SimpleJoystick::Direction::Right, []() {
+        Serial.println("Flick Right");
+    });
+
+    joy.btn().onClick([]() {
+        Serial.println("Stick Click");
     });
 }
 
 void loop() {
-    SimpleButton::tickAll();
+    SimpleNavigate::tickAll();
+}
+```
+
+---
+
+## 4. Модуль SimpleMatrix (Матричные клавиатуры)
+
+### Создание объекта
+```cpp
+SimpleMatrix keypad(rowPins, colPins, layout);
+```
+
+### Возможности
+- Сканирование матриц 3x4, 4x4, NxM без блокировки процессора.
+- Глобальное событие нажатия `onKeyPress` / `onKeyRelease`.
+- Доступ к любой физической клавише как к `SimpleButton`: метод `key(char id)`.
+
+### Пример
+```cpp
+#include <Arduino.h>
+#include <SimpleNavigate.h>
+
+std::vector<uint8_t> rowPins = {12, 13, 14, 15};
+std::vector<uint8_t> colPins = {16, 17, 18, 19};
+
+std::vector<std::vector<char>> layout = {
+    {'1', '2', '3', 'A'},
+    {'4', '5', '6', 'B'},
+    {'7', '8', '9', 'C'},
+    {'*', '0', '#', 'D'}
+};
+
+SimpleMatrix keypad(rowPins, colPins, layout);
+
+void setup() {
+    Serial.begin(115200);
+
+    keypad.onKeyPress([](char k) {
+        Serial.print("Pressed: ");
+        Serial.println(k);
+    });
+
+    keypad.key('#').onHold([]() {
+        Serial.println("# Held for 600ms");
+    });
+
+    keypad.key('*').onDoubleClick([]() {
+        Serial.println("* Double Click");
+    });
+}
+
+void loop() {
+    SimpleNavigate::tickAll();
+}
+```
+
+---
+
+## 5. Модуль SimpleAnalogKeypad (Резистивные АЦП-кнопки)
+
+### Возможности
+- Чтение нескольких кнопок на одном аналоговом пине через резистивный делитель.
+- Сглаживание шума и программный допуск по напряжению (`setTolerance`).
+- Каждая кнопка ведет себя как независимый объект `SimpleButton`.
+
+### Пример
+```cpp
+#include <Arduino.h>
+#include <SimpleNavigate.h>
+
+SimpleAnalogKeypad analogPad(36, 50);
+
+void setup() {
+    Serial.begin(115200);
+
+    analogPad.addKey('R', 0);
+    analogPad.addKey('U', 140);
+    analogPad.addKey('D', 330);
+    analogPad.addKey('L', 500);
+    analogPad.addKey('S', 740);
+
+    analogPad.key('S').onClick([]() {
+        Serial.println("Select Click");
+    });
+
+    analogPad.key('U').onStep([]() {
+        Serial.println("Up Auto-Repeat");
+    });
+}
+
+void loop() {
+    SimpleNavigate::tickAll();
+}
+```
+
+---
+
+## 6. Модуль SimpleTouch (Сенсоры ESP32)
+
+### Возможности
+- Прямая работа с аппаратными емкостными сенсорными пинами ESP32 (`touchRead`).
+- Автокалибровка фоновой емкости при запуске.
+- Доступ к кнопке через `touch.btn()` со всеми кликами и удержаниями.
+
+### Пример
+```cpp
+#include <Arduino.h>
+#include <SimpleNavigate.h>
+
+#if defined(ESP32)
+SimpleTouch touchBtn(T0, 15);
+#endif
+
+void setup() {
+    Serial.begin(115200);
+
+#if defined(ESP32)
+    touchBtn.btn().onClick([]() {
+        Serial.println("Touch Click");
+    });
+
+    touchBtn.btn().onHold([]() {
+        Serial.println("Touch Hold");
+    });
+#endif
+}
+
+void loop() {
+    SimpleNavigate::tickAll();
+}
+```
+
+---
+
+## 7. Фоновый опрос FreeRTOS (ESP32)
+
+На микроконтроллерах ESP32 библиотека позволяет полностью освободить `loop()` от вызовов опроса. Задача создается на отдельном ядре с интервалом 5 мс:
+
+```cpp
+#include <Arduino.h>
+#include <SimpleNavigate.h>
+
+SimpleButton btn(4);
+SimpleEncoder enc(5, 18, 19);
+
+void setup() {
+    Serial.begin(115200);
+
+    btn.onClick([]() {
+        Serial.println("Button Click");
+    });
+
+    enc.onLeft([]() {
+        Serial.println("Encoder Left");
+    });
+
+#if defined(ESP32)
+    SimpleNavigate::startBackgroundPoll(5, 1);
+#endif
+}
+
+void loop() {
 }
 ```
 
@@ -213,4 +424,6 @@ void loop() {
 
 ## Лицензия
 
-MIT License. Автор: NEEEVEEER
+Распространяется под свободной лицензией MIT.  
+Разработчик: **NEEEVEEER**
+
