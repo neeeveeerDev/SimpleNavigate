@@ -1,4 +1,9 @@
 # SimpleNavigate
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/NEEEVEEER/SimpleNavigate)
+[![Framework](https://img.shields.io/badge/Framework-Arduino%20%7C%20PlatformIO-orange.svg)](https://platformio.org/)
+[![Platform](https://img.shields.io/badge/Platform-ESP32%20%7C%20ESP8266%20%7C%20AVR%20%7C%20STM32%20%7C%20RP2040-green.svg)](https://github.com/NEEEVEEER/SimpleNavigate)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 SimpleNavigate — лёгкая и неблокирующая библиотека для работы с тактовыми кнопками, ацп кнопками, энкодерами, джойстиками , матричными клавиратурами на микроконтроллерах ESP32, ESP8266, Arduino и других совместимых платформах
 
 ---
